@@ -122,20 +122,20 @@ bring_balance_to_the_word:
 #rdi=codeword, %rsi=long len
 pushq %rbp
 movq %rsp,%rbp
-push %r13 # r13 is our counter 
-push %r15 #r15 is rdi forever and ever 
+pushq %r13 # r13 is our counter
+pushq %r14 #%r14 is k 
+push %r15 #r15 is codeword forever and ever 
 pushq %rbx #pop in line 128
-pushq %rdi #maintain %rdi current adress (for read input)
 movq %rdi,%r15 #r15 is rdi forever and ever v2
-call read_input
-popq %rdi #pushed in line 95
-movq %rax,%rsi #rax has n/8
-movq %rax,%rbx
+movq %r15, %rdi #rdi is codeword
+movq %rsi,%rbx
+movq %rsi, %r8 #when ever call hamming_weight do rsi = r8)
 shlq $5,%rbx # %rbx now contains n/2.
-pushq %r14 #%r14 is k
-xorq %r14,%r14
+movq $1,%r14
 loop_hw2:
 movq %r15,%rdi
+movq %r8, %rsi
+pushq %r8
 pushq %rdi #rdi contains the adress to codeword
 pushq %rsi #rsi contains n/8(=len)
 pushq %rbx # rbx contains n/2
@@ -143,35 +143,121 @@ call hamming_weight
 popq %rbx #rdi keeps the adress of codeword  
 popq %rsi  # rsi <- keep now n/8
 popq %rdi #rbx <- keeps n/2 
+popq %r8
 cmp %rax,%rbx # we ask if our current hamming weight equals to n/2
 je end 
-# not equal add 7 to offset
-movq %r14,%rsi
-xor %r13,%r13
-#save registers
-loop_in_loop_hw2:
-cmp %r13,%r14
-je end_loop_in_loop_hw2
-add %r13,%rdi
-pushq %rdi
-movq (%rdi),%rdi
-push %rbx
+decq %r14
+testq %r14, %r14 #for the first time, nothing to do then
+jz flip
+# first reverse last try
+xorq %r13, %r13
+xorq %rdx, %rdx #for idiv
+movq %r14, %rax #for idiv
+movq $64, %r9
+div %r9 #rax = k/64
+movq %rdx, %rsi #rsi = k mod 64
+movq %r15, %r10
+internal_loop_rev:#r13 in the index, rsi send to negate
+cmp %r13, %rax
+je end_internal_loop_rev
+#while r13<rax = k/64
+movq $64, %rsi
+leaq (%r10), %rdi #rdi is codeword[i]
+push %rax
+pushq %r10
+pushq %rbx
+pushq %r8
 call negate_first_k
-pop %rbx
-#pop registers
-popq %rdi
-movq %rax,(%rdi) #
+popq %r8
+popq %rbx
+popq %r10
+movq %rax, (%r10) 
+popq %rax
+addq $8, %r10 #r10 is codeword+i
 inc %r13
-jmp loop_in_loop_hw2
-end_loop_in_loop_hw2:
+jmp internal_loop_rev
+end_internal_loop_rev:
+xorq %rdx, %rdx #for idiv
+movq %r14, %rax #for idiv
+movq $64, %r9
+div %r9 #rax = k/64, #rsi = k mod 64
+### call negate one more time with k mod 64
+leaq (%r15, %rax, 8) , %r10
+movq (%r10), %rdi
+movq %rdx, %rsi
+pushq %r10
+pushq %rbx
+pushq %r8
+call negate_first_k
+popq %r8
+popq %rbx
+popq %r10
+movq %rax, (%r10)
+# now do the next filp
+flip:
+incq %r14
+xorq %r13, %r13
+xorq %rdx, %rdx #for idiv
+movq %r14, %rax #for idiv
+movq $64, %r9
+div %r9 #rax = k/64
+movq %rdx, %rsi #rsi = k mod 64
+movq %r15, %r10
+internal_loop:#r13 in the index, rsi send to negate
+cmp %r13, %rax
+je end_internal_loop
+#while r13<rax = k/64
+movq $64, %rsi
+leaq (%r10), %rdi #rdi is codeword[i]
+push %rax
+pushq %r10
+pushq %rbx
+pushq %r8
+call negate_first_k
+popq %r8
+popq %rbx
+popq %r10
+movq %rax, (%r10) 
+popq %rax
+addq $8, %r10 #r10 is codeword+i
+inc %r13
+jmp internal_loop
+end_internal_loop:
+xorq %rdx, %rdx #for idiv
+movq %r14, %rax #for idiv
+movq $64, %r9
+div %r9 #rax = k/64, #rsi = k mod 64
+### call negate one more time with k mod 64
+leaq (%r15, %rax, 8) , %r10
+movq (%r10), %rdi
+movq %rdx, %rsi
+pushq %r10
+pushq %rbx
+pushq %r8
+call negate_first_k
+popq %r8
+popq %rbx
+popq %r10
+movq %rax, (%r10)
 incq %r14 #k++ 
 jmp loop_hw2
 end:
 movq %r14,%rax #return k.
-popq %r14 #pushed in line 101
 popq %rbx #pushed in line 94 
 popq %r15
+popq %r14 #pushed in line 101
 popq %r13 # in teh begginging
 leave
 ret
 
+
+
+#add %r13,%rdi
+#pushq %rdi
+#movq (%rdi),%rdi
+#push %rbx
+#call negate_first_k
+#pop %rbx
+#pop registers
+#popq %rdi
+#movq %rax,(%rdi) #
