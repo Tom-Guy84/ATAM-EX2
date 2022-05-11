@@ -162,7 +162,7 @@ cmp %r13, %rax
 je end_internal_loop_rev
 #while r13<rax = k/64
 movq $64, %rsi
-leaq (%r10), %rdi #rdi is codeword[i]
+movq (%r10), %rdi #rdi is codeword[i]
 push %rax
 pushq %r10
 pushq %rbx
@@ -208,7 +208,7 @@ cmp %r13, %rax
 je end_internal_loop
 #while r13<rax = k/64
 movq $64, %rsi
-leaq (%r10), %rdi #rdi is codeword[i]
+movq (%r10), %rdi #rdi is codeword[i]
 push %rax
 pushq %r10
 pushq %rbx
@@ -242,6 +242,7 @@ movq %rax, (%r10)
 incq %r14 #k++ 
 jmp loop_hw2
 end:
+dec %r14
 movq %r14,%rax #return k.
 popq %rbx #pushed in line 94 
 popq %r15
