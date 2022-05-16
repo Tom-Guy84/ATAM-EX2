@@ -58,6 +58,11 @@ null_terminator:
     movq $0, %rax
     movq %r8, %rsi
     syscall
+    pushq %rax
+    movq $3, %rax
+    movq %r13, %rdi
+    syscall #close file
+    popq %rax
     popq %rdx
     movq %rdx, %rax
     shr $3, %rax
@@ -250,15 +255,3 @@ popq %r14 #pushed in line 101
 popq %r13 # in teh begginging
 leave
 ret
-
-
-
-#add %r13,%rdi
-#pushq %rdi
-#movq (%rdi),%rdi
-#push %rbx
-#call negate_first_k
-#pop %rbx
-#pop registers
-#popq %rdi
-#movq %rax,(%rdi) #
