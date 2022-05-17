@@ -3,28 +3,36 @@
 .text
 .align 4, 0x90
 my_ili_handler:
-    movq (%rsp), %rax #rax is users rip
-    movq (%rax), %rax
-    shr $48, %rax #ax contain the opcode ??
+    pushq %r12
+    pushq %r13
+    xorq %r12, %r12 #tp change the rip in the needed offset
     xorq %rdi, %rdi
-    movq $0xf00, %rdx
-    andq %rax, %rdx
-    cmpq $0xf00, %rdx
+    xorq %rcx, %rcx
+    movq 16(%rsp), %rax #rax is users rip
+    leaq 16(%rsp), %r13 #rip to change
+    movb (%rax), %cl
+    cmpb $0x0f, %cl
     je opcode_is_last_byte
-    shr $8, %rax
-    movq %rax, %rdi #rdi contains the upper byte of the opcode
+    movq $1, %r12
+    movq %rcx, %rdi #rdi contains the upper byte of the opcode
     jmp call_what_to_do
 opcode_is_last_byte:
-    andq $0xff, %rax
-    movq %rax, %rdi #rdi contains the byte after 0x0f (lower byte)
+    movb 1(%rax), %cl
+    movq %rcx, %rdi #rdi contains the byte after 0x0f (lower byte)
+    movq $2, %r12
 call_what_to_do:
     call what_to_do
-    cmp $0, %rax 
+    movq %rax, %rdi
+    cmp $0, %rdi
     jne return_from_handler
-    movq old_ili_handler, %rax #if got here, need to activate the original ili handler.
-    jmp *%rax
     
-return_from_handler:
-    movq %rax, -8(%rbp)    
+    popq %r13
+    popq %r12
+    jmp *old_ili_handler
+    
+return_from_handler:   
+    addq %r12, (%r13)
+    popq %r13
+    popq %r12
       
   iretq
