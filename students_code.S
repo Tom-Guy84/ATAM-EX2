@@ -82,9 +82,11 @@ calc_hamming_weight_HW2:
 testq %rsi,%rsi
 jz end_hamming_weight_HW2
 decq %rsi
+push %rdi
 leaq (%rdi,%r8,8),%rdi
 movq (%rdi),%r9
 incq %r8
+pop %rdi
 ##### start of algorithm#######
 test %r9,%r9
 jz calc_hamming_weight_HW2
