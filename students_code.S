@@ -72,37 +72,21 @@ null_terminator:
   ret
 
 hamming_weight:
-push %rbp
-movq %rsp,%rbp
-###end test
-# rdi represent unsigned long* codeword,%rsi represents unsinged long len , we have len 8 bytes
-xor %rax,%rax #rax: = count<-0
-xor %r8,%r8 #%r8:= index
-calc_hamming_weight_HW2:
-testq %rsi,%rsi
-jz end_hamming_weight_HW2
-decq %rsi
-push %rdi
-leaq (%rdi,%r8,8),%rdi
-movq (%rdi),%r9
-incq %r8
-pop %rdi
-##### start of algorithm#######
-test %r9,%r9
-jz calc_hamming_weight_HW2
-inc %rax #inc %rdx
-loop_HW2:
-movq %r9,%r10 #r10 is temp register
-dec %r10
-andq %r10,%r9
-cmpq $0,%r9
-jz calc_hamming_weight_HW2
-inc %rax #inc %rdx
-jmp loop_HW2
-############# end of algorithm ##########
-end_hamming_weight_HW2:
-leave
-ret
+    pushq %rbp
+    movq %rsp, %rbp
+    xor %rax, %rax # counter
+loop_calc:
+    mov (%rdi), %r11
+    popcnt %r11, %r10
+    addq %r10, %rax
+    addq $8, %rdi 
+    dec %rsi
+    test %rsi, %rsi
+    jne loop_calc
+
+    leave
+    ret
+
 
 negate_first_k: # rdi is the code word, rsi is the number of bits to flip
 #rdi doesnt contain the whole word...
@@ -132,16 +116,24 @@ movq %rsp,%rbp
 pushq %r13 # r13 is our counter
 pushq %r14 #%r14 is k 
 push %r15 #r15 is codeword forever and ever 
-pushq %rbx #pop in line 128
+pushq %rbx
 movq %rdi,%r15 #r15 is rdi forever and ever v2
-movq %r15, %rdi #rdi is codeword
 movq %rsi,%rbx
 movq %rsi, %r8 #when ever call hamming_weight do rsi = r8)
 shlq $5,%rbx # %rbx now contains n/2.
-movq $1,%r14
+
+
+
+
+#### starting preps for the flips.
+xorq %r13, %r13 #offset in bytes from the beginning of codeword.
+xorq %r14, %r14 #k=0
+
+
 loop_hw2:
-movq %r15,%rdi
-movq %r8, %rsi
+xorq %r10, %r10
+movq %r15,%rdi #setup rdi to be codeword for calc
+movq %r8, %rsi #for hamming weight
 pushq %r8
 pushq %rdi #rdi contains the adress to codeword
 pushq %rsi #rsi contains n/8(=len)
@@ -153,103 +145,86 @@ popq %rdi #rbx <- keeps n/2
 popq %r8
 cmp %rax,%rbx # we ask if our current hamming weight equals to n/2
 je end 
-decq %r14
-testq %r14, %r14 #for the first time, nothing to do then
-jz flip
-# first reverse last try
-xorq %r13, %r13
-xorq %rdx, %rdx #for idiv
-movq %r14, %rax #for idiv
-movq $64, %r9
-div %r9 #rax = k/64
-movq %rdx, %rsi #rsi = k mod 64
-movq %r15, %r10
-internal_loop_rev:#r13 in the index, rsi send to negate
-cmp %r13, %rax
-je end_internal_loop_rev
-#while r13<rax = k/64
-movq $64, %rsi
-movq (%r10), %rdi #rdi is codeword[i]
-push %rax
-pushq %r10
-pushq %rbx
-pushq %r8
-call negate_first_k
-popq %r8
-popq %rbx
-popq %r10
-movq %rax, (%r10) 
-popq %rax
-addq $8, %r10 #r10 is codeword+i
-inc %r13
-jmp internal_loop_rev
-end_internal_loop_rev:
-xorq %rdx, %rdx #for idiv
-movq %r14, %rax #for idiv
-movq $64, %r9
-div %r9 #rax = k/64, #rsi = k mod 64
-### call negate one more time with k mod 64
-leaq (%r15, %rax, 8) , %r10
-movq (%r10), %rdi
-movq %rdx, %rsi
-pushq %r10
-pushq %rbx
-pushq %r8
-call negate_first_k
-popq %r8
-popq %rbx
-popq %r10
-movq %rax, (%r10)
+
+
+inc %r14
+cmp $65, %r14
+jne negate_last_byte_flipped
+movq $1, %r14
+inc %r13 #if number of fliped bits was 64, inc r13 and set k=1
+
 # now do the next filp
+### goal - to filp only the next index mod 64 in the wanted byte.
 flip:
-incq %r14
-xorq %r13, %r13
-xorq %rdx, %rdx #for idiv
-movq %r14, %rax #for idiv
-movq $64, %r9
-div %r9 #rax = k/64
-movq %rdx, %rsi #rsi = k mod 64
-movq %r15, %r10
-internal_loop:#r13 in the index, rsi send to negate
-cmp %r13, %rax
-je end_internal_loop
-#while r13<rax = k/64
-movq $64, %rsi
-movq (%r10), %rdi #rdi is codeword[i]
-push %rax
+##movq %r15, %r10
+##addq %r13, %r10 #now r10 contains the address fo the wanted byte to flip
+leaq (%r15, %r13, 8) , %r10
+movq (%r10), %rdi #now rdi contains the watned byte to flip
+movq %r14,  %rsi #rsi is k for negate
 pushq %r10
-pushq %rbx
 pushq %r8
-call negate_first_k
-popq %r8
-popq %rbx
-popq %r10
-movq %rax, (%r10) 
-popq %rax
-addq $8, %r10 #r10 is codeword+i
-inc %r13
-jmp internal_loop
-end_internal_loop:
-xorq %rdx, %rdx #for idiv
-movq %r14, %rax #for idiv
-movq $64, %r9
-div %r9 #rax = k/64, #rsi = k mod 64
-### call negate one more time with k mod 64
-leaq (%r15, %rax, 8) , %r10
-movq (%r10), %rdi
-movq %rdx, %rsi
-pushq %r10
 pushq %rbx
-pushq %r8
 call negate_first_k
-popq %r8
-popq %rbx
+pop %rbx
+pop %r8
 popq %r10
-movq %rax, (%r10)
-incq %r14 #k++ 
+movq %rax, (%r10) #update codeword
 jmp loop_hw2
+###now need to check hamming weight, if not good then do the last part
+
+
+negate_last_byte_flipped:
+cmp $1, %r14
+je flip
+decq %r14
+##movq %r15, %r10
+##addq %r13, %r10 #now r10 contains the address fo the wanted byte to flip
+leaq (%r15, %r13, 8) , %r10
+movq (%r10), %rdi #now rdi contains the watned byte to flip
+movq %r14,  %rsi #rsi is k for negate
+pushq %r10
+pushq %r8
+pushq %rbx
+call negate_first_k
+pop %rbx
+pop %r8
+popq %r10
+movq %rax, (%r10) #update codeword 
+inc %r14
+jmp flip
+
+
+
+
+
+
+##end_internal_loop:
+###xorq %rdx, %rdx #for idiv
+###movq %r14, %rax #for idiv
+###movq $64, %r9
+###div %r9 #rax = k/64, #rsi = k mod 64
+### call negate one more time with k mod 64
+###leaq (%r15, %r13, 8) , %r10
+###movq (%r10), %rdi
+###movq %rdx, %rsi
+###pushq %r10
+###pushq %rbx
+###pushq %r8
+###call negate_first_k
+###popq %r8
+###popq %rbx
+###popq %r10
+###movq %rax, (%r10)
+###incq %r14 #k++ 
+###jmp loop_hw2
+
+
+
+
+
 end:
-dec %r14
+shl $6, %r13
+add %r13, %r14
 movq %r14,%rax #return k.
 popq %rbx #pushed in line 94 
 popq %r15
